@@ -6,10 +6,10 @@ import { Readable } from 'stream'
 import { finished } from 'stream/promises'
 
 /**
- * 棉宝魔法配置区 (｡•̀ᴗ-)✧
+ * 魔法配置区 (｡•̀ᴗ-)✧
  */
-const CD_SECONDS = 3
-const ALLOWED_GROUPS = [330178432] // 这里填入允许的群号，例如 [123, 456]。如果是空的 [] 则所有群都生效哦！
+const CD_SECONDS = 3     // 问答触发CD
+const ALLOWED_GROUPS = [123456] // 这里填入允许的群号，例如 [123, 456]。如果是空的 [] 则所有群都生效哦！
 const ENABLE_PRIVATE = false // 是否开启私聊响应？true为开启，false为关闭 (๑>◡<๑)
 
 // --- 跨时空记忆区 ---
@@ -19,7 +19,7 @@ const tempLists = {}
 export class QA extends plugin {
   constructor() {
     super({
-      name: '棉宝-全能问答',
+      name: 'QA-全能问答',
       event: 'message',
       priority: 5000,
       rule: [
@@ -98,7 +98,7 @@ export class QA extends plugin {
   }
 
   checkCD(e) {
-    // --- 棉宝的访问权限判定 (。-`ω´-) ---
+    // --- 访问权限判定 (。-`ω´-) ---
     if (e.isGroup) {
       if (ALLOWED_GROUPS.length > 0 && !ALLOWED_GROUPS.includes(e.group_id)) {
         return false
@@ -175,14 +175,14 @@ export class QA extends plugin {
 
     if (lines.length <= 10) {
       // 10组以内直接回复
-      let msg = ['(๑>◡<๑) 棉宝的知识库清单：\n', ...formattedLines]
+      let msg = ['(๑>◡<๑) 知识库清单：\n', ...formattedLines]
       msg.push('\n使用指令~删除问答+编号进行删除，多个编号之间用，分割')
       await e.reply(msg.join('\n'))
     } else {
       // 超过10组使用合并转发消息
       let msgNodes = []
       msgNodes.push({
-        message: '(๑>◡<๑) 棉宝的知识库清单：',
+        message: '(๑>◡<๑) 知识库清单：',
         nickname: Bot.nickname,
         user_id: Bot.uin
       })
@@ -220,7 +220,7 @@ export class QA extends plugin {
     const match = e.msg.match(reg)
     const numStr = (match[2] || '').trim()
     if (!numStr) {
-      await e.reply('(｡•́︿•̀｡) 主人还没告诉我要删掉哪个编号呢！')
+      await e.reply('(｡•́︿•̀｡) 还没告诉我要删掉哪个编号呢！')
       return true
     }
     const indices = numStr.split(/,|，/).map(n => parseInt(n.trim()) - 1).filter(n => !isNaN(n))
@@ -281,7 +281,7 @@ export class QA extends plugin {
         const text = reply.replace(/\[img:.*?\]/g, '').trim()
         let imgName = imgMatch[1]
         
-        // --- 棉宝的路径防错魔法 (｡•̀ᴗ-)✧ ---
+        // --- 路径防错魔法 (｡•̀ᴗ-)✧ ---
         // 1. 如果路径里有反斜杠或斜杠，说明存的是绝对路径，我们只提取最后的文件名
         if (imgName.includes('\\') || imgName.includes('/')) {
           imgName = path.basename(imgName)
