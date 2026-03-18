@@ -6,10 +6,10 @@ import { Readable } from 'stream'
 import { finished } from 'stream/promises'
 
 /**
- * 魔法配置区 (｡•̀ᴗ-)✧
+ * 棉宝魔法配置区 (｡•̀ᴗ-)✧
  */
-const CD_SECONDS = 3     // 问答触发CD
-const ALLOWED_GROUPS = [123456] // 这里填入允许的群号，例如 [123, 456]。如果是空的 [] 则所有群都生效哦！
+const CD_SECONDS = 3
+const ALLOWED_GROUPS = [] // 这里填入允许的群号，例如 [123, 456]。如果是空的 [] 则所有群都生效哦！
 const ENABLE_PRIVATE = false // 是否开启私聊响应？true为开启，false为关闭 (๑>◡<๑)
 
 // --- 跨时空记忆区 ---
@@ -19,12 +19,13 @@ const tempLists = {}
 export class QA extends plugin {
   constructor() {
     super({
-      name: 'QA-全能问答',
+      name: '棉宝-全能问答',
       event: 'message',
-      priority: 5000,
+      priority: 100, // 提升优先级 (。-`ω´-) 从5000改为100
       rule: [
         {
-          reg: '^~添加(模糊|精确)问(.*)答(.*)$',
+          // 这里的正则也升级，兼容换行符
+          reg: '^~添加(模糊|精确)问[\\s\\S]*答[\\s\\S]*$',
           fnc: 'addQA'
         },
         {
@@ -32,7 +33,7 @@ export class QA extends plugin {
           fnc: 'listQA'
         },
         {
-          reg: '^~(删除问答|问答删除)(.*)$',
+          reg: '^~(删除问答|问答删除)[\\s\\S]*$',
           fnc: 'deleteQA'
         },
         {
@@ -98,7 +99,7 @@ export class QA extends plugin {
   }
 
   checkCD(e) {
-    // --- 访问权限判定 (。-`ω´-) ---
+    // --- 棉宝的访问权限判定 (。-`ω´-) ---
     if (e.isGroup) {
       if (ALLOWED_GROUPS.length > 0 && !ALLOWED_GROUPS.includes(e.group_id)) {
         return false
@@ -119,7 +120,14 @@ export class QA extends plugin {
   }
 
   async addQA(e) {
-    const reg = /^~添加(模糊|精确)问(.*)答(.*)$/
+    // 权限校验：主人或管理员。注意：私聊时 e.isAdmin 可能为 false，所以主人判断在前
+    if (!e.isMaster && !e.isAdmin) {
+      await e.reply("(｡•́︿•̀｡) 只有管理员才能教我新知识哦！")
+      return true
+    }
+
+    // 重点：使用 [\\s\\S]* 来匹配包括换行在内的所有内容 (。-`ω´-)
+    const reg = /^~添加(模糊|精确)问([\s\S]*)答([\s\S]*)$/
     const match = e.msg.match(reg)
     if (!match) return false
 
@@ -141,7 +149,7 @@ export class QA extends plugin {
     
     try {
       this.saveData(lines)
-      await e.reply(`(๑>◡<๑) 棉宝已经把新知识记下来啦！\n类型：${type}问\n问题：${q}`)
+      await e.reply(`(๑>◡<๑) 我已经把新知识记下来啦！\n类型：${type}问\n问题：${q}`)
     } catch (err) {
       await e.reply(`(｡>ㅅ<｡) 呜呜，记笔记失败了：${err.message}`)
     }
@@ -175,14 +183,14 @@ export class QA extends plugin {
 
     if (lines.length <= 10) {
       // 10组以内直接回复
-      let msg = ['(๑>◡<๑) 知识库清单：\n', ...formattedLines]
+      let msg = ['(๑>◡<๑) 我的知识库清单：\n', ...formattedLines]
       msg.push('\n使用指令~删除问答+编号进行删除，多个编号之间用，分割')
       await e.reply(msg.join('\n'))
     } else {
       // 超过10组使用合并转发消息
       let msgNodes = []
       msgNodes.push({
-        message: '(๑>◡<๑) 知识库清单：',
+        message: '(๑>◡<๑) 我的知识库清单：',
         nickname: Bot.nickname,
         user_id: Bot.uin
       })
@@ -211,16 +219,22 @@ export class QA extends plugin {
   }
 
   async deleteQA(e) {
+    // 权限校验 (。-`ω´-)
+    if (!e.isMaster && !e.isAdmin) {
+      await e.reply("(｡•́︿•̀｡) 只有管理员才能抹掉我的记忆哦！")
+      return true
+    }
+
     const id = this.getIdentifier(e)
     if (!tempLists[id]) {
       await e.reply('(｡>ㅅ<｡) 请先发送 ~问答列表 查看编号后再进行删除操作哦！')
       return true
     }
-    const reg = /^~(删除问答|问答删除)(.*)$/
+    const reg = /^~(删除问答|问答删除)([\s\S]*)$/
     const match = e.msg.match(reg)
     const numStr = (match[2] || '').trim()
     if (!numStr) {
-      await e.reply('(｡•́︿•̀｡) 还没告诉我要删掉哪个编号呢！')
+      await e.reply('(｡•́︿•̀｡) 主人还没告诉我要删掉哪个编号呢！')
       return true
     }
     const indices = numStr.split(/,|，/).map(n => parseInt(n.trim()) - 1).filter(n => !isNaN(n))
@@ -264,13 +278,14 @@ export class QA extends plugin {
     })
 
     let matchedItem = null
+    const userMsg = (e.msg || "").trim()
     for await (const line of rl) {
       const trimmed = line.trim()
       if (!trimmed) continue
       try {
         const item = JSON.parse(trimmed)
-        if (item.f === 1 && e.msg && e.msg.includes(item.q)) { matchedItem = item; break }
-        if (item.f === 0 && e.msg && e.msg.trim() === item.q.trim()) { matchedItem = item }
+        if (item.f === 1 && userMsg.includes(item.q)) { matchedItem = item; break }
+        if (item.f === 0 && userMsg === item.q.trim()) { matchedItem = item; break }
       } catch (err) {}
     }
 
@@ -281,20 +296,16 @@ export class QA extends plugin {
         const text = reply.replace(/\[img:.*?\]/g, '').trim()
         let imgName = imgMatch[1]
         
-        // --- 路径防错魔法 (｡•̀ᴗ-)✧ ---
-        // 1. 如果路径里有反斜杠或斜杠，说明存的是绝对路径，我们只提取最后的文件名
         if (imgName.includes('\\') || imgName.includes('/')) {
           imgName = path.basename(imgName)
         }
         
         const imgPath = path.join(this.baseDir, imgName)
         
-        // 2. 发送前先做存在性检查，并转为 Base64 发送，解决跨环境路径不通的问题 (๑>◡<๑)
         if (fs.existsSync(imgPath)) {
           const base64 = fs.readFileSync(imgPath, 'base64')
           await e.reply([text, segment.image(`base64://${base64}`)])
         } else {
-          // 图片丢失时的温和处理方案
           let lostMsg = text ? `${text}\n` : ''
           await e.reply(`${lostMsg}(｡>ㅅ<｡) 呜呜，这张图片好像在异世界走丢了...`)
         }
